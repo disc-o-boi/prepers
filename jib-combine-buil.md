@@ -181,3 +181,188 @@ This command maps port `8080` on your local machine to port `8080` in the contai
 By using the **Jib Maven Plugin**, you can easily containerize and deploy a combined Spring Boot and Angular application without needing a `Dockerfile`. Jib simplifies the build process, automatically pushing the image to your Docker registry.
 
 If you want to serve a standalone Angular application using **NGINX** or another server, it's generally easier to stick with a `Dockerfile` approach, but for a Spring Boot + Angular project, Jib provides a smooth and integrated workflow.
+
+
+#############
+
+The error **"Main class was not found"** usually occurs when **Jib** cannot locate the main class in your Java application during the containerization process. This is typically a configuration issue with Jib or Maven, or it could be caused by the structure of your project.
+
+Below are some steps you can follow to resolve this issue.
+
+### Step 1: Check `pom.xml` for the Main Class
+
+Ensure that your `pom.xml` is correctly configured, particularly if you're using a **Spring Boot** application. The main class needs to be properly specified so that Jib can find it and build the container correctly.
+
+In your `pom.xml`, you may need to explicitly define the main class under the Jib plugin's configuration, like so:
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>com.google.cloud.tools</groupId>
+            <artifactId>jib-maven-plugin</artifactId>
+            <version>3.1.4</version>
+            <configuration>
+                <!-- Specify the fully qualified name of the main class -->
+                <mainClass>com.example.yourpackage.YourApplicationClass</mainClass>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+Replace `com.example.yourpackage.YourApplicationClass` with the fully qualified name of the main class (i.e., the class with the `public static void main(String[] args)` method).
+
+For **Spring Boot**, this is typically the class annotated with `@SpringBootApplication`, for example:
+
+```java
+@SpringBootApplication
+public class YourApplicationClass {
+    public static void main(String[] args) {
+        SpringApplication.run(YourApplicationClass.class, args);
+    }
+}
+```
+
+### Step 2: Ensure Your Project is Packaged as a JAR
+
+For a Java project, ensure that it is packaged correctly as a **JAR** file with a manifest that correctly identifies the main class. To check that, ensure that your **Maven `pom.xml`** has the following in its build section:
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+        </plugin>
+    </plugins>
+</build>
+```
+
+This plugin helps ensure that the **Spring Boot** application is built correctly, including the manifest file with the correct `Main-Class` entry.
+
+You can verify this by running:
+
+```bash
+mvn clean package
+```
+
+Then inspect the `META-INF/MANIFEST.MF` file within the resulting `jar` file (you can unzip the jar file) to check if the `Main-Class` is specified correctly:
+
+```bash
+Main-Class: com.example.yourpackage.YourApplicationClass
+```
+
+### Step 3: Ensure Proper Project Structure
+
+Make sure that your Java source code is located in the correct directory structure, as required by Maven. Maven expects the main Java files to be in:
+
+```
+src/main/java/com/example/yourpackage/YourApplicationClass.java
+```
+
+If your classes are not in the correct directory, Jib and Maven may not find the main class.
+
+### Step 4: Ensure Dependencies are Correct
+
+Sometimes this issue can arise if there are missing dependencies or incompatible versions of libraries. For example, if you're using Spring Boot, ensure that you have the correct dependencies for Spring Boot, as well as other dependencies your project might need.
+
+In your `pom.xml`, ensure you have something like this for Spring Boot:
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-web</artifactId>
+    </dependency>
+    <!-- Other dependencies -->
+</dependencies>
+```
+
+If there are issues with dependencies, Jib might fail to identify the main class properly.
+
+### Step 5: Clean and Rebuild the Project
+
+Sometimes, Maven's build cache or target directory may become stale, and a clean build might help. Run the following commands to clean and rebuild the project:
+
+```bash
+mvn clean install
+mvn jib:build
+```
+
+This will clean up any old files and ensure everything is built from scratch.
+
+### Step 6: Double Check Your Maven `pom.xml` Jib Configuration
+
+Ensure that your `pom.xml` does not have conflicting configurations. Below is an example of a properly configured **Jib** plugin for a **Spring Boot** application:
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>com.google.cloud.tools</groupId>
+            <artifactId>jib-maven-plugin</artifactId>
+            <version>3.1.4</version>
+            <configuration>
+                <to>
+                    <image>mycontainerregistry.azurecr.io/my-app</image>
+                </to>
+                <!-- Fully qualified name of the main class -->
+                <mainClass>com.example.yourpackage.YourApplicationClass</mainClass>
+                <!-- Configure ports -->
+                <container>
+                    <ports>
+                        <port>8080</port>
+                    </ports>
+                </container>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+```
+
+### Step 7: Jib `jar` or `war` Packaging
+
+Make sure your **packaging** type is correctly set in your `pom.xml`. If you're building a **Spring Boot** application that is packaged as a `jar`, your `pom.xml` should look like this:
+
+```xml
+<packaging>jar</packaging>
+```
+
+If you're building a web application that uses **WAR packaging**, ensure this is properly set:
+
+```xml
+<packaging>war</packaging>
+```
+
+Jib will behave differently based on whether it's packaging a `jar` or `war`, so it's important to specify this correctly.
+
+### Step 8: Use Jib's `jar` Mode (Optional)
+
+If you still face issues, you can explicitly tell Jib to use the **Jar processing mode** in the `pom.xml`:
+
+```xml
+<configuration>
+    <containerizingMode>packaged</containerizingMode>
+</configuration>
+```
+
+This instructs Jib to containerize the pre-built JAR file, which may help if Jib is failing to locate the main class in its default mode.
+
+---
+
+### Recap
+
+If you're seeing the error **"Main class was not found"** when using Jib, follow these steps:
+
+1. **Add the `mainClass` to Jib's configuration** in `pom.xml`.
+2. **Ensure the project's directory structure** follows Maven conventions.
+3. **Check your `META-INF/MANIFEST.MF`** file to verify that the main class is correctly specified.
+4. **Clean and rebuild the project** to ensure that the build artifacts are up to date.
+5. **Ensure dependencies and Spring Boot setup** in your `pom.xml` are correct.
+
+Once these are set up correctly, running `mvn jib:build` should successfully package your Java app into a container and push it to Azure Container Registry (or another registry).
